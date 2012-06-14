@@ -150,11 +150,11 @@ if smf_is_globalzone; then
             ADMIN_NIC_UP=true
 
             # also setup resolv.conf if we can
+            rm -f /etc/resolv.conf
             if [[ -n ${CONFIG_dns_search} ]]; then
-                echo "domain ${CONFIG_dns_search}" > /etc/resolv.conf
+                echo "search ${CONFIG_dns_search}" >> /etc/resolv.conf
             fi
             if [[ -n ${CONFIG_dns_resolvers} ]]; then
-                echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
                 for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
                     echo "nameserver ${serv}" >> /etc/resolv.conf
                 done
@@ -180,17 +180,14 @@ if smf_is_globalzone; then
             ifconfig ${fallback_nic} 2&>1 > /dev/null || ifconfig ${fallback_nic} plumb
             ifconfig ${fallback_nic} dhcp || /bin/true
 
+            # Setup a "hope for the best" DNS configuration
+            echo "nameserver 8.8.8.8" >  /etc/resolv.conf
+            echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+
         else
             echo "ERROR: admin NIC not found, and couldn't find any links to bring up."
             exit ${SMF_EXIT_ERR_CONFIG}
         fi
-    fi
-
-
-    # Setup external NIC
-    if [[ -n ${SYSINFO_NIC_external} ]] && [[ -n "${CONFIG_external_ip}" ]]; then
-        vnic_up "${SYSINFO_NIC_external}" "external0" "${CONFIG_external_ip}" \
-            "${CONFIG_external_netmask}" "${CONFIG_external_vlan_id}" "" "primary"
     fi
 
     # Set up the GZ to NAT for Coal
