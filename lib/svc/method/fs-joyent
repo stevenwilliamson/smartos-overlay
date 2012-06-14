@@ -63,8 +63,7 @@ if [ $? -ne 0 ]; then
         fi
     done
 
-    svccfg -s svc:/system/smartdc/init setprop \
-        config/zpool=${SYS_ZPOOL}
+    svccfg -s svc:/system/smartdc/init setprop config/zpool=${SYS_ZPOOL}
     svccfg -s svc:/system/smartdc/init:default refresh
 
     # If the destroy_zpools boot parameter is set, destroy all zpools
@@ -91,24 +90,23 @@ if [ $? -ne 0 ]; then
           mount -O -F lofs /var/svc/manifest/site /opt/smartdc/agents/smf
         fi
 
-  if [[ -n $(/bin/bootparams | grep '^headnode=true') || \
-        -n $(/bin/bootparams | grep '^smartos=true') ]]; then
-        mkdir /usbkey
-    mount -F zfs ${SYS_ZPOOL}/usbkey /usbkey
-  fi
-  if [[ -n $(/bin/bootparams | grep '^smartos=true') ]]; then
-    mount -F lofs /usbkey/shadow /etc/shadow
-    mount -F lofs /usbkey/ssh /etc/ssh
-  fi
+        if [[ -n $(/bin/bootparams | grep '^headnode=true') || \
+              -n $(/bin/bootparams | grep '^smartos=true') ]]; then
+            mkdir /usbkey
+            mount -F zfs ${SYS_ZPOOL}/usbkey /usbkey
+        fi
+        if [[ -n $(/bin/bootparams | grep '^smartos=true') ]]; then
+            mount -F lofs /usbkey/shadow /etc/shadow
+            mount -F lofs /usbkey/ssh /etc/ssh
+        fi
 
-  swap -a /dev/zvol/dsk/${SYS_ZPOOL}/swap
-	dumpadm -y -d /dev/zvol/dsk/${SYS_ZPOOL}/dump
+        swap -a /dev/zvol/dsk/${SYS_ZPOOL}/swap
+        dumpadm -y -d /dev/zvol/dsk/${SYS_ZPOOL}/dump
 
-	ln -s /${SYS_ZPOOL}/global/cores /cores
+        ln -s /${SYS_ZPOOL}/global/cores /cores
 
-	[[ -f /${SYS_ZPOOL}/currbooted ]] && \
-            mv /${SYS_ZPOOL}/currbooted /${SYS_ZPOOL}/lastbooted
-	uname -v >/${SYS_ZPOOL}/currbooted
+        [[ -f /${SYS_ZPOOL}/currbooted ]] && mv /${SYS_ZPOOL}/currbooted /${SYS_ZPOOL}/lastbooted
+        uname -v >/${SYS_ZPOOL}/currbooted
     fi
 fi
 
