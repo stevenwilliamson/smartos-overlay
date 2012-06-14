@@ -68,20 +68,16 @@ case "$1" in
             fi
 
 	    # Start interactive config on console and ttys
-
-            ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}" \
-                </dev/console >&/dev/console &
+        ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}" </dev/console >&/dev/console &
 	    cnt=1
 
 	    if [ -c /dev/ttya ]; then
-                ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}" \
-                    </dev/ttya >&/dev/ttya &
+                ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}" </dev/ttya >&/dev/ttya &
                 cnt=`expr $cnt + 1`
 	    fi
 
 	    if [ -c /dev/ttyb ]; then
-                ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}" \
-                    </dev/ttyb >&/dev/ttyb &
+                ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}" </dev/ttyb >&/dev/ttyb &
                 cnt=`expr $cnt + 1`
 	    fi
 
@@ -105,8 +101,7 @@ case "$1" in
                 exit $SMF_EXIT_OK
             fi
 
-            /smartdc/bin/smartos_prompt_config.sh "${USB_PATH}" \
-                </dev/console >&/dev/console
+            /smartdc/bin/smartos_prompt_config.sh "${USB_PATH}" </dev/console >&/dev/console
 
             # If user quit from interactive configuration then we're done.
             [[ ! -f ${USB_PATH}/config ]] && exit $SMF_EXIT_OK
@@ -120,8 +115,7 @@ case "$1" in
     # Write the info about this datacenter to /.dcinfo so we can use in the GZ
     echo "SDC_DATACENTER_NAME='${CONFIG_datacenter_name}'" > /.dcinfo
     if [[ "${SYSINFO_Bootparam_headnode}" == "true" ]]; then
-        echo "SDC_DATACENTER_HEADNODE_ID=${CONFIG_datacenter_headnode_id}" \
-            >> /.dcinfo
+        echo "SDC_DATACENTER_HEADNODE_ID=${CONFIG_datacenter_headnode_id}" >> /.dcinfo
     fi
 
     if [[ -n "${SYSINFO_Bootparam_smartos}" && -f /usbkey/shadow ]]; then

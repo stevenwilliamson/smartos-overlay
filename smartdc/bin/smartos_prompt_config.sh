@@ -543,8 +543,16 @@ while [ /usr/bin/true ]; do
 	promptnic "'admin'"
 	admin_nic="$val"
 
+  promptval "Enter a hostname (or leave blank for auto)" ""
+  hostname="$val"
+
+  promptval "Enter the dataceter name" ""
+  datacenter_name="$val"
+  
 	promptnet "IP address (or 'dhcp' )" "$admin_ip"
 	admin_ip="$val"
+
+
   if [[ $admin_ip != 'dhcp' ]]; then
     promptnet "netmask" "$admin_netmask"
     admin_netmask="$val"
@@ -621,6 +629,8 @@ echo >>$tmp_config
 platform=$(smbios -t1 | nawk '{if ($1 == "Product:") print $2}')
 [ "$platform" == "VMware" ] && echo "coal=true" >>$tmp_config
 
+echo "hostname=$hostname" >>$tmp_config
+echo "datacenter_name=$datacenter_name" >>$tmp_config
 
 echo "# admin_nic is the nic admin_ip will be connected to for headnode zones."\
     >>$tmp_config
