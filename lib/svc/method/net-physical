@@ -130,60 +130,62 @@ if smf_is_globalzone; then
         dladm create-etherstub -t $stub || echo "ERROR: could not create etherstub ${stub}."
     done
 
+    # Setup link aggregates
+    for aggr in $(echo "${CONFIG_aggrs}" | sed -e "s/,/ /g"); do
+        ifaces=$(eval echo \$CONFIG_"$aggr"_ifaces | sed -e "s/,/ /g")
+        # plumb then unplumb aggr interfaces
+        for aggr_iface in $ifaces; do
+            ifconfig $aggr_iface plumb >/dev/null 2>&1 || echo "WARN: Couldn't plumb ${aggr_iface}"
+            ifconfig $aggr_iface unplumb >/dev/null 2>&1 || echo "ERROR: Couldn't unplumb ${aggr_iface}"
+        done
+        dladm create-aggr $(echo "$ifaces" | sed -e "s/ / -l /g" -e "s/^/-l /g") -L $(eval echo \$CONFIG_"$aggr"_lacp_mode) $aggr || echo "ERROR: could not create aggreagate ${aggr}."
+    done
+
     # Setup admin NIC
     if [[ -n ${SYSINFO_NIC_admin} ]]; then
         ifconfig ${SYSINFO_NIC_admin} plumb
-        if [[ ${headnode} == "true" ]]; then
-            if [[ -n ${CONFIG_admin_ip} ]] && [[ -n ${CONFIG_admin_netmask} ]];
-            then
-                ifconfig ${SYSINFO_NIC_admin} inet ${CONFIG_admin_ip} \
-                    netmask ${CONFIG_admin_netmask} up
-                ADMIN_NIC_UP=true
 
-                # also setup resolv.conf if we can
-                if [[ -n ${CONFIG_dns_domain} ]] && [[ -n ${CONFIG_dns_resolvers} ]]; then
-                    echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
-                    for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
-                        echo "nameserver ${serv}" >> /etc/resolv.conf
-                    done
-                fi
-            else
-                echo "ERROR: headnode but no admin_{ip,netmask} in config, not bringing up admin network."
-                # Set a flag, but try to plumb the other interfaces anyway
-                ADMIN_NIC_MISCONFIGURED=true
+        if [[ -n ${CONFIG_admin_ip} ]] && [[ -n ${CONFIG_admin_netmask} ]]; then
+            ifconfig ${SYSINFO_NIC_admin} inet ${CONFIG_admin_ip} netmask ${CONFIG_admin_netmask} up
+            ADMIN_NIC_UP=true
+
+            # also setup resolv.conf if we can
+            if [[ -n ${CONFIG_dns_search} ]]; then
+                echo "domain ${CONFIG_dns_search}" > /etc/resolv.conf
             fi
-         elif [[ -n $(/usr/bin/bootparams | grep "^smartos") ]]; then
-            if [[ -n ${CONFIG_admin_ip} ]] && [[ -n ${CONFIG_admin_netmask} ]]; then
-                ifconfig ${SYSINFO_NIC_admin} inet ${CONFIG_admin_ip} \
-                    netmask ${CONFIG_admin_netmask} up
-                ADMIN_NIC_UP=true
-
-                # also setup resolv.conf if we can
-                if [[ -n ${CONFIG_dns_domain} ]] && [[ -n ${CONFIG_dns_resolvers} ]]; then
-                    echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
-                    for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
-                        echo "nameserver ${serv}" >> /etc/resolv.conf
-                    done
-                fi
-            else
-                ifconfig ${SYSINFO_NIC_admin} dhcp || /bin/true
-                ADMIN_NIC_UP=true
+            if [[ -n ${CONFIG_dns_resolvers} ]]; then
+                echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
+                for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
+                    echo "nameserver ${serv}" >> /etc/resolv.conf
+                done
             fi
-
         else
-            # We ignore errors here because the most common one is that DHCP is
-            # already running.
             ifconfig ${SYSINFO_NIC_admin} dhcp || /bin/true
             ADMIN_NIC_UP=true
         fi
+
         # If on VMWare, create a bridge which allows traffic to flow correctly to the host-only network
         if [[ "${ADMIN_NIC_UP}" == "true" ]] && [[ ${SYSINFO_Product} == "VMware Virtual Platform" ]]; then
             dladm create-bridge -l ${SYSINFO_NIC_admin} vmwarebr
         fi
     else
-        echo "ERROR: admin NIC not found, unable to bring up admin network."
-        exit ${SMF_EXIT_ERR_CONFIG}
+        # Hmm, no admin nic configured. Try to get a DHCP lease from the first available link...
+        # (We're probably in unconfigured boot)
+        fallback_nic=`dladm show-link -po link | head -1`
+
+        if [[ -n ${fallback_nic} ]]; then
+            echo "Using fallback nic ${fallback_nic} as no admin nic is configured."
+
+            # Plumb it and kick off DHCP
+            ifconfig ${fallback_nic} 2&>1 > /dev/null || ifconfig ${fallback_nic} plumb
+            ifconfig ${fallback_nic} dhcp || /bin/true
+
+        else
+            echo "ERROR: admin NIC not found, and couldn't find any links to bring up."
+            exit ${SMF_EXIT_ERR_CONFIG}
+        fi
     fi
+
 
     # Setup external NIC
     if [[ -n ${SYSINFO_NIC_external} ]] && [[ -n "${CONFIG_external_ip}" ]]; then
@@ -205,57 +207,10 @@ map external0 ${CIDR} -> 0.0.0.0/32 portmap tcp/udp auto
 IPNAT
     fi
 
-    # Use headnode_default_gateway if set, otherwise fall back to admin_gateway
-    # if that's set.
-    if [[ -n "${CONFIG_headnode_default_gateway}" ]]; then
-        echo "${CONFIG_headnode_default_gateway}" > /etc/defaultrouter
-    elif [[ -n ${CONFIG_admin_gateway} ]]; then
-        echo "${CONFIG_admin_gateway}" > /etc/defaultrouter
-    fi
+    # Configure the defaultrouter
+    echo "${CONFIG_admin_gateway}" > /etc/defaultrouter
 
-    # Setup extra nics, if specified in the config file
-    nic_tags="${SYSINFO_Nic_Tags}"
-    if [[ -n "${nic_tags}" ]]; then
-        tags=(${nic_tags//,/ })
 
-        bootparam_ip_keys=$(sdc_bootparams_keys | grep -- "-ip$" || true)
-        config_ip_keys=$(sdc_config_keys | grep "_ip$" || true)
-        for tag in "${tags[@]}"; do
-
-            eval "link=\${SYSINFO_NIC_${tag}}"
-            if [[ -z "${link}" ]]; then
-                echo "WARNING: No link found with tag '${tag}'"
-                continue
-            fi
-
-            for key in ${config_ip_keys}; do
-                if [[ ${key} == ${tag}[0-9]_ip ]] || [[ ${key} == ${tag}[0-9][0-9]_ip ]]; then
-                    iface=${key//_ip/}
-                    #echo "   iface=$iface"
-                    eval "ip=\${CONFIG_${iface}_ip}"
-                    eval "netmask=\${CONFIG_${iface}_netmask}"
-                    eval "vlan=\${CONFIG_${iface}_vlan_id}"
-                    eval "macaddr=\${CONFIG_${iface}_mac}"
-
-                    echo vnic_up "${link}" "${iface}" "${ip}" "${netmask}" "${vlan}" "${macaddr}"
-                    vnic_up "${link}" "${iface}" "${ip}" "${netmask}" "${vlan}" "${macaddr}"
-                fi
-            done
-
-            for key in ${bootparam_ip_keys}; do
-                if [[ ${key} == ${tag}[0-9]-ip ]] || [[ ${key} == ${tag}[0-9][0-9]-ip ]]; then
-                    iface=${key//-ip/}
-                    eval "ip=\${BOOT_${iface}_ip}"
-                    eval "netmask=\${BOOT_${iface}_netmask}"
-                    eval "vlan=\${BOOT_${iface}_vlan_id}"
-                    eval "macaddr=\${BOOT_${iface}_mac}"
-                    echo vnic_up "${link}" "${iface}" "${ip}" "${netmask}" "${vlan}" "${macaddr}"
-                    vnic_up "${link}" "${iface}" "${ip}" "${netmask}" "${vlan}" "${macaddr}"
-                fi
-            done
-
-        done
-    fi
 else
     # Non-global zones
     for iface in `dladm show-vnic -p -o link`; do
