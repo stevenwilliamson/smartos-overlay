@@ -91,7 +91,24 @@ case "$1" in
             # If user quit from interactive configuration then we're done.
             [[ ! -f ${USB_PATH}/config ]] && exit $SMF_EXIT_OK
         fi
+    elif /bin/bootparams | grep "^zookeeper=" > /dev/null 2>&1; then
+
+        # Figure out the path to the USB stick (or zfs /usbkey directory)
+        USB_PATH=/`svcprop -p "joyentfs/usb_copy_path" svc:/system/filesystem/smartdc:default`
+        ZOOKEEPER=`/bin/bootparams | grep "^zookeeper=" | cut -d'=' -f2-`
+        
+        # Are we configured? Does our configuration file exist?
+        if [[ ! -f ${USB_PATH}/config ]]; then
+
+            # Start the ZooKeeper configuration agent hooked upto the console
+            /usr/bin/node /smartdc/bin/configuration-agent.js "${ZOOKEEPER}" "${USB_PATH}" < /dev/console >&/dev/console
+
+            # Reboot!
+            /usr/sbin/reboot
+        fi
+
     elif /bin/bootparams | grep "^smartos=true" > /dev/null 2>&1; then
+
         USB_PATH=/`svcprop -p "joyentfs/usb_copy_path" svc:/system/filesystem/smartdc:default`
 
         # Check for config and run interactive if it doesn't exist.
