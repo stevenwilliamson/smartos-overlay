@@ -101,7 +101,7 @@ case "$1" in
         if [[ ! -f ${USB_PATH}/config ]]; then
 
             # Start the ZooKeeper configuration agent hooked upto the console
-            /usr/bin/node /smartdc/bin/configuration-agent.js "${ZOOKEEPER}" "${USB_PATH}" < /dev/console >&/dev/console
+            NODE_PATH=/usr/node_modules /usr/bin/node /smartdc/bin/configuration-agent.js "${ZOOKEEPER}" "${USB_PATH}" < /dev/console >&/dev/console
 
             # Reboot!
             /usr/sbin/reboot
