@@ -177,7 +177,9 @@ if smf_is_globalzone; then
             echo "Using fallback nic ${fallback_nic} as no admin nic is configured."
 
             # Plumb it and kick off DHCP
-            ifconfig ${fallback_nic} || ifconfig ${fallback_nic} plumb
+            ifconfig ${fallback_nic} unplumb || /bin/true
+
+            ifconfig ${fallback_nic} plumb
             ifconfig ${fallback_nic} dhcp || /bin/true
 
             # Setup a "hope for the best" DNS configuration
@@ -204,9 +206,11 @@ map external0 ${CIDR} -> 0.0.0.0/32 portmap tcp/udp auto
 IPNAT
     fi
 
-    # Configure the defaultrouter
-    echo "${CONFIG_admin_gateway}" > /etc/defaultrouter
-
+    if [[ -n ${CONFIG_admin_gateway} ]]; then
+        echo "Setting gateway to ${CONFIG_admin_gateway}"
+        # Configure the defaultrouter
+        echo "${CONFIG_admin_gateway}" > /etc/defaultrouter
+    fi
 
 else
     # Non-global zones
