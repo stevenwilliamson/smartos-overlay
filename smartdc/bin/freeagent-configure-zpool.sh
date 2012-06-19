@@ -199,8 +199,6 @@ stty erase ^H
 
 create_zpools $*
 
-clear
-
 cp -rp /etc/ssh /usbkey/ssh
 cp /usr/ds/etc/sources.list.sample /var/db/dsadm/sources.list
 
