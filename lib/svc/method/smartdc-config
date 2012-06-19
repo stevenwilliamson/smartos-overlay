@@ -104,7 +104,11 @@ case "$1" in
             NODE_PATH=/usr/node_modules /usr/bin/node /smartdc/bin/configuration-agent.js "${ZOOKEEPER}" "${USB_PATH}" < /dev/console >&/dev/console
 	
 	    # Reboot!
-	    /bin/bootparams | grep "^noreboot=true$" || /usr/sbin/reboot
+	    if /bin/bootparams | grep "^noreboot=true$" > /dev/null 2>&1; then
+            exit $SMF_EXIT_OK
+        else
+            echo "Rebooting!"
+            /usr/sbin/reboot
         fi
 
     elif /bin/bootparams | grep "^smartos=true" > /dev/null 2>&1; then
