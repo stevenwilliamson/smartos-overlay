@@ -177,7 +177,7 @@ if smf_is_globalzone; then
             echo "Using fallback nic ${fallback_nic} as no admin nic is configured."
 
             # Plumb it and kick off DHCP
-            ifconfig ${fallback_nic} 2&>1 > /dev/null || ifconfig ${fallback_nic} plumb
+            ifconfig ${fallback_nic} || ifconfig ${fallback_nic} plumb
             ifconfig ${fallback_nic} dhcp || /bin/true
 
             # Setup a "hope for the best" DNS configuration
