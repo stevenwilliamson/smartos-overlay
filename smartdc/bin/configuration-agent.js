@@ -84,10 +84,9 @@ var zookeeperConnectReturned = function(err) {
   if( err ) {
     // Bah, we failed to connect.
     console.log("Failed to connect to zookeeper: "+err.toString());
-    console.log("  retrying in 2 seconds...");
 
     // Try again in a moment...
-    setTimeout(connectToZookeeper, 2000);
+    //setTimeout(connectToZookeeper, 2000);
   } else {
     zookeeperConnected();
   }

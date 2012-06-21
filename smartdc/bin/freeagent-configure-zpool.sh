@@ -54,14 +54,12 @@ setup_datasets()
   fi
 
   if ! echo $datasets | grep ${USBKEYDS} > /dev/null; then
-    if [[ -n $(/bin/bootparams | grep "^smartos=true") ]]; then
-        printf "%-56s" "Creating config dataset... " 
-        zfs create -o mountpoint=legacy ${USBKEYDS} || \
-          fatal "failed to create the config dataset"
-        mkdir /usbkey
-        mount -F zfs ${USBKEYDS} /usbkey
-        printf "%4s\n" "done" 
-    fi
+    printf "%-56s" "Creating config dataset... " 
+    zfs create -o mountpoint=legacy ${USBKEYDS} || \
+      fatal "failed to create the config dataset"
+    mkdir /usbkey
+    mount -F zfs ${USBKEYDS} /usbkey
+    printf "%4s\n" "done" 
   fi
 
   if ! echo $datasets | grep ${COREDS} > /dev/null; then

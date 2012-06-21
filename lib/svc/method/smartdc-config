@@ -103,12 +103,13 @@ case "$1" in
             # Start the ZooKeeper configuration agent hooked upto the console
             NODE_PATH=/usr/node_modules /usr/bin/node /smartdc/bin/configuration-agent.js "${ZOOKEEPER}" "${USB_PATH}" < /dev/console >&/dev/console
 	
-	    # Reboot!
-	    if /bin/bootparams | grep "^noreboot=true$" > /dev/null 2>&1; then
-            exit $SMF_EXIT_OK
-        else
-            echo "Rebooting!"
-            /usr/sbin/reboot
+    	    # Reboot!
+    	    if /bin/bootparams | grep "^noreboot=true$" > /dev/null 2>&1; then
+                exit $SMF_EXIT_OK
+            else
+                echo "Rebooting!"
+                /usr/sbin/reboot
+            fi
         fi
 
     elif /bin/bootparams | grep "^smartos=true" > /dev/null 2>&1; then
