@@ -6,14 +6,6 @@ export PATH
 load_sdc_sysinfo
 load_sdc_config
 
-sigexit()
-{
-  echo
-  echo "System configuration has not been completed."
-  echo "You must reboot to re-run system configuration."
-  exit 0
-}
-
 create_dump()
 {
     # Get avail zpool size - this assumes we're not using any space yet.
@@ -57,7 +49,7 @@ setup_datasets()
     printf "%-56s" "Creating config dataset... " 
     zfs create -o mountpoint=legacy ${USBKEYDS} || \
       fatal "failed to create the config dataset"
-    mkdir /usbkey
+    mkdir -p /usbkey
     mount -F zfs ${USBKEYDS} /usbkey
     printf "%4s\n" "done" 
   fi
@@ -88,90 +80,34 @@ setup_datasets()
     fi
 
     zfs set mountpoint=legacy ${VARDS}
-
-    if ! echo $datasets | grep ${SWAPVOL} > /dev/null; then
-          printf "%-56s" "Creating swap zvol... " 
-          #
-          # We cannot allow the swap size to be less than the size of DRAM, lest$
-          # we run into the availrmem double accounting issue for locked$
-          # anonymous memory that is backed by in-memory swap (which will$
-          # severely and artificially limit VM tenancy).  We will therfore not$
-          # create a swap device smaller than DRAM -- but we still allow for the$
-          # configuration variable to account for actual consumed space by using$
-          # it to set the refreservation on the swap volume if/when the$
-          # specified size is smaller than DRAM.$
-          #
-          size=${SYSINFO_MiB_of_Memory}
-          zfs create -V ${size}mb ${SWAPVOL}
-          swap -a /dev/zvol/dsk/${SWAPVOL}
-    fi
-    printf "%4s\n" "done" 
   fi
+  printf "%4s\n" "done" 
+
+  if ! echo $datasets | grep ${SWAPVOL} > /dev/null; then
+        printf "%-56s" "Creating swap zvol... " 
+        #
+        # We cannot allow the swap size to be less than the size of DRAM, lest$
+        # we run into the availrmem double accounting issue for locked$
+        # anonymous memory that is backed by in-memory swap (which will$
+        # severely and artificially limit VM tenancy).  We will therfore not$
+        # create a swap device smaller than DRAM -- but we still allow for the$
+        # configuration variable to account for actual consumed space by using$
+        # it to set the refreservation on the swap volume if/when the$
+        # specified size is smaller than DRAM.$
+        #
+        size=${SYSINFO_MiB_of_Memory}
+        zfs create -V ${size}mb ${SWAPVOL}
+        swap -a /dev/zvol/dsk/${SWAPVOL}
+  fi
+  printf "%4s\n" "done" 
 }
 
-
-create_zpool()
+setup_zpool()
 {
-    disks=$1
-    pool=zones
-
-    # If the pool already exists, don't create it again.
-    if /usr/sbin/zpool list -H -o name $pool; then
-        return 0
-    fi
-
-    disk_count=$(echo "${disks}" | wc -w | tr -d ' ')
-    printf "%-56s" "Creating pool $pool... " 
-
-    # If no pool profile was provided, use a default based on the number of
-    # devices in that pool.
-    if [[ -z ${profile} ]]; then
-        case ${disk_count} in
-        0)
-             fatal "no disks found, can't create zpool";;
-        1)
-             profile="";;
-        2)
-             profile=mirror;;
-        *)
-             profile=raidz;;
-        esac
-    fi
-
-    zpool_args=""
-
-    # When creating a mirrored pool, create a mirrored pair of devices out of
-    # every two disks.
-    if [[ ${profile} == "mirror" ]]; then
-        ii=0
-        for disk in ${disks}; do
-            if [[ $(( $ii % 2 )) -eq 0 ]]; then
-                  zpool_args="${zpool_args} ${profile}"
-            fi
-            zpool_args="${zpool_args} ${disk}"
-            ii=$(($ii + 1))
-        done
-    else
-        zpool_args="${profile} ${disks}"
-    fi
-
-    zpool create -f ${pool} ${zpool_args} || \
-        fatal "failed to create pool ${pool}"
-    zfs set atime=off ${pool} || \
-        fatal "failed to set atime=off for pool ${pool}"
-
-    printf "%4s\n" "done" 
-}
-
-create_zpools()
-{
-  devs=$1
-
-  export SYS_ZPOOL="zones"
-  create_zpool "$devs"
+  export SYS_ZPOOL=$1
   sleep 5
 
-  svccfg -s svc:/system/smartdc/init setprop config/zpool="zones"
+  svccfg -s svc:/system/smartdc/init setprop config/zpool="${SYS_ZPOOL}"
   svccfg -s svc:/system/smartdc/init:default refresh
 
   export CONFDS=${SYS_ZPOOL}/config
@@ -189,12 +125,14 @@ create_zpools()
   touch /${SYS_ZPOOL}/.system_pool
 }
 
-trap sigexit SIGINT
+# Create the zpool using the command line
+zpool create -f zones $* || fatal "failed to create pool zones"
+zfs set atime=off zones || fatal "failed to set atime=off for pool zones"
 
-create_zpools $*
+setup_zpool zones
 
-! [[ -e /usbkey/ssh ]] && cp -rp /etc/ssh /usbkey/ssh
+! [ -e /usbkey/ssh ] && cp -rp /etc/ssh /usbkey/ssh
 cp /usr/img/etc/sources.list.sample /var/db/imgadm/sources.list
 
 echo "zpool created"
-exit(0)
+exit 0
