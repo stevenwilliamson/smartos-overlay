@@ -191,12 +191,10 @@ create_zpools()
 
 trap sigexit SIGINT
 
-export TERM=sun-color
-export TERM=xterm-color
-stty erase ^H
-
 create_zpools $*
 
-cp -rp /etc/ssh /usbkey/ssh
-cp /usr/ds/etc/sources.list.sample /var/db/dsadm/sources.list
+! [[ -e /usbkey/ssh ]] && cp -rp /etc/ssh /usbkey/ssh
+cp /usr/img/etc/sources.list.sample /var/db/imgadm/sources.list
 
+echo "zpool created"
+exit(0)
