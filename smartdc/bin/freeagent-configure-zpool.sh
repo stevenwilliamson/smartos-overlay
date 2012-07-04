@@ -132,7 +132,8 @@ zfs set atime=off zones || fatal "failed to set atime=off for pool zones"
 setup_zpool zones
 
 ! [ -e /usbkey/ssh ] && cp -rp /etc/ssh /usbkey/ssh
-cp /usr/img/etc/sources.list.sample /var/db/imgadm/sources.list
+
+mkdir -p /var/db/imgadm && cp /usr/img/etc/sources.list.sample /var/db/imgadm/sources.list
 
 echo "zpool created"
 exit 0
