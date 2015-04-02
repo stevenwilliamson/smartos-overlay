@@ -1,4 +1,13 @@
 #!/usr/bin/bash
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+
+#
+# Copyright (c) 2014, Joyent, Inc.
+#
 
 # XXX - TODO
 # - if $ntp_hosts == "local", configure ntp for no external time source
@@ -13,7 +22,7 @@ load_sdc_config
 # Defaults
 datacenter_headnode_id=0
 mail_to="root@localhost"
-ntp_hosts="pool.ntp.org"
+ntp_hosts="0.smartos.pool.ntp.org"
 dns_resolver1="8.8.8.8"
 dns_resolver2="8.8.4.4"
 
@@ -562,6 +571,9 @@ while [ /usr/bin/true ]; do
     promptnet "netmask" "$admin_netmask"
     admin_netmask="$val"
 
+    ip_netmask_to_network $admin_ip $admin_netmask
+    admin_network="$net_a.$net_b.$net_c.$net_d"
+
     printheader "Networking - Continued"
     message=""
     
@@ -615,7 +627,6 @@ while [ /usr/bin/true ]; do
 	[ "$val" == "y" ] && break
 	clear
 done
-admin_network="$net_a.$net_b.$net_c.$net_d"
 
 #
 # Generate config file
